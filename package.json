@@ -1,0 +1,8 @@
+{
+  "name": "quackamole-shared-types",
+  "version": "0.0.4",
+  "description": "Typescript types shared across quackamole project repositories.",
+  "types": ".index.d.ts",
+  "author": "Andreas Schoch",
+  "license": "MIT"
+}
