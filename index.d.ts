@@ -45,145 +45,118 @@ export interface IUserSecret {
   secret: string;
 }
 
-////////////////////////////////////////////
-// ROOM EVENT MESSAGES - SERVER TO CLIENT //
-////////////////////////////////////////////
+///////////////////////////////
+// SERVER TO CLIENT MESSAGES //
+///////////////////////////////
 
-export interface IBaseRoomEventMessage {
-  type: 'room_event';
+// SERVER TO CLIENT MESSAGES - EVENTS //
+export type RoomEventMessage = IRoomEventJoinMessage | IRoomEventLeaveMessage | IRoomEventUserDataChangeMessage | IRoomEventPluginSet;
+
+export interface IBaseServerToSocketMessage {
+  type: string;
+  awaitId: AwaitId;
+  timestamp: number;
+  data: unknown;
+}
+
+export interface IBaseRoomEventMessage extends IBaseServerToSocketMessage {
   roomId: RoomId;
-  eventType: 'user_joined' | 'user_left' | 'user_data_changed' | 'admin_settings_changed' | 'plugin_set';
 }
 
 export interface IRoomEventJoinMessage extends IBaseRoomEventMessage {
-  eventType: 'user_joined';
+  type: 'room_event__user_joined';
   data: { user: IUser };
 }
 
 export interface IRoomEventLeaveMessage extends IBaseRoomEventMessage {
-  eventType: 'user_left';
+  type: 'room_event__user_left';
   data: { user: IUser };
 }
 
 export interface IRoomEventUserDataChangeMessage extends IBaseRoomEventMessage {
-  eventType: 'user_data_changed';
+  type: 'room_event__user_data_changed';
   data: { user: IUser, changedProperties: (keyof IUser)[] };
 }
 
 export interface IRoomEventPluginSet extends IBaseRoomEventMessage {
-  eventType: 'plugin_set';
-  data: { roomId: RoomId, iframeId: IframeId, plugin: IPlugin | null };
+  type: 'room_event__plugin_set';
+  data: { iframeId: IframeId, plugin: IPlugin | null };
 }
 
-//////////////////////////////////////
-// CLIENT TO SERVER ACTION MESSAGES //
-//////////////////////////////////////
+// SERVER TO CLIENT MESSAGES - REQUEST RESPONSES //
+export type RequestResponseMessage = IRoomCreateResponseMessage | IRoomJoinResponseMessage | IUserRegisterResponseMessage | IUserLoginResponseMessage | IPluginSetResponseMessage;
 
-export type SocketToServerMessage = IMessageRelayMessage | ICreateRoomMessage | IRoomJoinMessage | IBroadcastMessage | IUserRegisterMessage | IUserLoginMessage | IPluginSetMessage;
-
-interface IBaseSocketToServerMessage {
-  awaitId?: AwaitId;
-  data: unknown;
-  timestamp?: number; // set on server
-  socketId?: UserId; // set on server
-}
-
-export interface IBroadcastMessage extends IBaseSocketToServerMessage {
-  action: 'room_broadcast';
-  data: {roomIds: RoomId[]};
-}
-
-export interface IMessageRelayMessage<T = unknown> extends IBaseSocketToServerMessage {
-  action: 'message_relay';
- data: { roomId: RoomId, receiverIds?: SocketId[], relayData: T};
-}
-
-export interface ICreateRoomMessage extends IBaseSocketToServerMessage {
-  action: 'room_create';
-  data: Partial<IBaseRoom>;
-}
-
-export interface IRoomJoinMessage extends IBaseSocketToServerMessage {
-  action: 'room_join';
-  data: { roomId: RoomId };
-}
-
-export interface IUserRegisterMessage extends IBaseSocketToServerMessage {
-  action: 'user_register';
-  data: { displayName: string };
-}
-
-export interface IUserLoginMessage extends IBaseSocketToServerMessage {
-  action: 'user_login';
-  data: { secret: string };
-}
-
-export interface IPluginSetMessage extends IBaseSocketToServerMessage {
-  action: 'plugin_set';
-  data: { roomId: RoomId, iframeId: IframeId, plugin: IPlugin | null };
-}
-
-///////////////////////////////////////////////
-// CLIENT TO SERVER ACTION RESPONSE MESSAGES //
-///////////////////////////////////////////////
-
-export type RoomJoinErrorCode = 'wrong_password' | 'already_full' | 'does_not_exist' | 'already_joined' | 'invalid_admin_id' | null | undefined;
-export type RoomCreateErrorCode = string | null | undefined;
-export type UserRegisterErrorCode = 'missing_display_name' | 'display_name_too_short' | 'display_name_too_long' | null | undefined;
-export type UserLoginErrorCode = 'user_not_found' | 'wrong_secret' | null | undefined;
-export type PluginSetErrorCode = 'room_not_found' | 'plugin_not_found_in_db' | 'permission_denied' | null | undefined;
-
-export interface IMessageRelayDeliveryMessage<T = unknown> {
-  type: 'message_relay_delivery';
-  awaitId: AwaitId;
-  errors: string[];
-  senderId: SocketId; // prevents malicious user from pretending to be someone else as this is set by server
-  data: T;
-}
 
 export interface IBaseResponseMessage {
   type: string;
+  requestType: string;
   awaitId: string;
-  errors: (string | null | undefined)[];
 }
 
+export type RoomCreateErrorCode = string;
 export interface IRoomCreateResponseMessage extends IBaseResponseMessage {
-  type: 'room_create_response';
+  type: 'request_response__room_create';
+  requestType: ICreateRoomMessage['type'];
   errors: RoomCreateErrorCode[];
   room: IAdminRoom;
 }
 
+export type RoomJoinErrorCode = 'wrong_password' | 'already_full' | 'does_not_exist' | 'already_joined' | 'invalid_admin_id';
 export interface IRoomJoinResponseMessage extends IBaseResponseMessage {
-  type: 'room_join_response';
+  type: 'request_response__room_join';
+  requestType: IRoomJoinMessage['type'];
   errors: RoomJoinErrorCode[];
   room: IBaseRoom;
   users: IUser[];
 }
 
+export type UserRegisterErrorCode = 'missing_display_name' | 'display_name_too_short' | 'display_name_too_long';
 export interface IUserRegisterResponseMessage extends IBaseResponseMessage {
-  type: 'user_register_response';
+  type: 'request_response__user_register';
+  requestType: IUserRegisterMessage['type'];
   user: IUser;
   secret: string;
   errors: UserRegisterErrorCode[];
 }
 
+export type UserLoginErrorCode = 'user_not_found' | 'wrong_secret';
 export interface IUserLoginResponseMessage extends IBaseResponseMessage {
-  type: 'user_login_response';
+  type: 'request_response__user_login';
+  requestType: IUserLoginMessage['type'];
   token: string;
   user: IUser;
   errors: UserLoginErrorCode[];
 }
 
+export type PluginSetErrorCode = 'room_not_found' | 'plugin_not_found_in_db' | 'permission_denied';
 export interface IPluginSetResponseMessage extends IBaseResponseMessage {
-  type: 'plugin_set_response';
+  type: 'request_response__plugin_set';
+  requestType: IPluginSetMessage['type'];
   roomId: RoomId;
   iframeId: IframeId;
   plugin: IPlugin | null;
 }
 
-/////////////////////////////////////////////////
-// RELAY MESSAGES THE SERVER DOESNT CARE ABOUT //
-/////////////////////////////////////////////////
+export interface IGeneralErrorResponseMessage extends IBaseResponseMessage {
+  type: 'request_response__general_error';
+  requestType: RequestMessage['type'];
+  code: number; // comparable to http status codes to give some more context about type of error
+  message: string;
+}
+
+////////////////////////////////////////////////
+// SOCKET TO SOCKET VIA SERVER RELAY MESSAGES //
+////////////////////////////////////////////////
+
+// This message type is special not sure in which category to put it
+export interface IMessageRelayDeliveryMessage<T = unknown> {
+  type: 'message_relay_delivery';
+  awaitId: AwaitId;
+  roomId: RoomId;
+  senderId: SocketId; // set by server to prevent malicious users from pretending to send messages as someone else
+  errors: string[];
+  relayData: T;
+}
 
 export interface IRTCSessionDescriptionMessage {
   type: 'session_description';
@@ -199,6 +172,58 @@ export interface IRTCIceCandidatesMessage {
   iceCandidates: RTCIceCandidateInit[];
   senderSocketId: SocketId;
 }
+
+///////////////////////////////
+// SOCKET TO SERVER MESSAGES //
+///////////////////////////////
+
+export type RequestMessage = IMessageRelayMessage | ICreateRoomMessage | IRoomJoinMessage | IBroadcastMessage | IUserRegisterMessage | IUserLoginMessage | IPluginSetMessage;
+
+interface IBaseSocketToServerMessage {
+  awaitId: AwaitId;
+  data: never;
+  body: unknown; // Imagine it like the body of an http request
+  timestamp?: number; // set on server on arrival
+  socketId?: UserId; // set on server on arrival
+}
+
+export interface IBroadcastMessage extends IBaseSocketToServerMessage {
+  type: 'request__room_broadcast';
+  body: {roomIds: RoomId[]};
+}
+
+export interface IMessageRelayMessage<T = unknown> extends IBaseSocketToServerMessage {
+  type: 'request__message_relay';
+  body: { roomId: RoomId, receiverIds?: SocketId[], relayData: T};
+}
+
+export interface ICreateRoomMessage extends IBaseSocketToServerMessage {
+  type: 'request__room_create';
+  body: Partial<IBaseRoom>;
+}
+
+export interface IRoomJoinMessage extends IBaseSocketToServerMessage {
+  type: 'request__room_join';
+  body: { roomId: RoomId };
+}
+
+export interface IUserRegisterMessage extends IBaseSocketToServerMessage {
+  type: 'request__user_register';
+  body: { displayName: string };
+}
+
+export interface IUserLoginMessage extends IBaseSocketToServerMessage {
+  type: 'request__user_login';
+  body: { secret: string };
+}
+
+export interface IPluginSetMessage extends IBaseSocketToServerMessage {
+  type: 'request__plugin_set';
+  body: { roomId: RoomId, iframeId: IframeId, plugin: IPlugin | null };
+}
+
+///////////////////////////////////////////////
+// CLIENT TO SERVER ACTION RESPONSE MESSAGES //
 
 ///////////////////
 // VARIOUS TYPES //
