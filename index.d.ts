@@ -49,14 +49,16 @@ export interface IUserSecret {
 // SERVER TO CLIENT MESSAGES //
 ///////////////////////////////
 
-// SERVER TO CLIENT MESSAGES - EVENTS //
+export type ServerToSocketMessage = RoomEventMessage | RequestResponseMessage | IMessageRelayDeliveryMessage | IErrorResponseMessage;
 export type RoomEventMessage = IRoomEventJoinMessage | IRoomEventLeaveMessage | IRoomEventUserDataChangeMessage | IRoomEventPluginSet;
+export type RequestResponseMessage = IRoomCreateResponseMessage | IRoomJoinResponseMessage | IUserRegisterResponseMessage | IUserLoginResponseMessage | IPluginSetResponseMessage;
 
+// SERVER TO CLIENT MESSAGES - EVENTS //
 export interface IBaseServerToSocketMessage {
   type: string;
-  awaitId: AwaitId;
   timestamp: number;
   data: unknown;
+  awaitId?: AwaitId;
 }
 
 export interface IBaseRoomEventMessage extends IBaseServerToSocketMessage {
@@ -84,61 +86,56 @@ export interface IRoomEventPluginSet extends IBaseRoomEventMessage {
 }
 
 // SERVER TO CLIENT MESSAGES - REQUEST RESPONSES //
-export type RequestResponseMessage = IRoomCreateResponseMessage | IRoomJoinResponseMessage | IUserRegisterResponseMessage | IUserLoginResponseMessage | IPluginSetResponseMessage;
 
 
 export interface IBaseResponseMessage {
   type: string;
   requestType: string;
-  awaitId: string;
+  awaitId: AwaitId;
 }
 
 export type RoomCreateErrorCode = string;
 export interface IRoomCreateResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__room_create';
+  type: 'response__room_create';
   requestType: ICreateRoomMessage['type'];
-  errors: RoomCreateErrorCode[];
   room: IAdminRoom;
 }
 
 export type RoomJoinErrorCode = 'wrong_password' | 'already_full' | 'does_not_exist' | 'already_joined' | 'invalid_admin_id';
 export interface IRoomJoinResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__room_join';
+  type: 'response__room_join';
   requestType: IRoomJoinMessage['type'];
-  errors: RoomJoinErrorCode[];
   room: IBaseRoom;
   users: IUser[];
 }
 
 export type UserRegisterErrorCode = 'missing_display_name' | 'display_name_too_short' | 'display_name_too_long';
 export interface IUserRegisterResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__user_register';
+  type: 'response__user_register';
   requestType: IUserRegisterMessage['type'];
   user: IUser;
   secret: string;
-  errors: UserRegisterErrorCode[];
 }
 
 export type UserLoginErrorCode = 'user_not_found' | 'wrong_secret';
 export interface IUserLoginResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__user_login';
+  type: 'response__user_login';
   requestType: IUserLoginMessage['type'];
   token: string;
   user: IUser;
-  errors: UserLoginErrorCode[];
 }
 
 export type PluginSetErrorCode = 'room_not_found' | 'plugin_not_found_in_db' | 'permission_denied';
 export interface IPluginSetResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__plugin_set';
+  type: 'response__plugin_set';
   requestType: IPluginSetMessage['type'];
   roomId: RoomId;
   iframeId: IframeId;
   plugin: IPlugin | null;
 }
 
-export interface IGeneralErrorResponseMessage extends IBaseResponseMessage {
-  type: 'request_response__general_error';
+export interface IErrorResponseMessage extends IBaseResponseMessage {
+  type: 'response__error';
   requestType: RequestMessage['type'];
   code: number; // comparable to http status codes to give some more context about type of error
   message: string;
@@ -154,9 +151,17 @@ export interface IMessageRelayDeliveryMessage<T = unknown> {
   awaitId: AwaitId;
   roomId: RoomId;
   senderId: SocketId; // set by server to prevent malicious users from pretending to send messages as someone else
-  errors: string[];
   relayData: T;
-}
+} 
+
+// TODO consider sending the RTC signalling NOT via relay but with its own mechanism
+//  For example the sending of the offer could be a REQUEST and the answer could be a RESPONSE to it
+//  The nice thing of this would be the ability to implement a CALL feature where the callee can choose to accept or decline the call
+//  There are few usecases I can think about where this would be useful:
+//  - The callee is not in the same room as the caller
+//  - The callee is in the same room but it's a special type of room where connections are not automatic on join
+//  - The callee is offline and will receive a push notification with a link to join
+//  - Fully private 1:1 calls with no room involved (or a special type of temporary room that exists for duration of call or until both parties leave)
 
 export interface IRTCSessionDescriptionMessage {
   type: 'session_description';
@@ -181,7 +186,7 @@ export type RequestMessage = IMessageRelayMessage | ICreateRoomMessage | IRoomJo
 
 interface IBaseSocketToServerMessage {
   awaitId: AwaitId;
-  data: never;
+  // data: never;
   body: unknown; // Imagine it like the body of an http request
   timestamp?: number; // set on server on arrival
   socketId?: UserId; // set on server on arrival
